@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
-	"time"
 )
 
 var emptyString = ""
@@ -37,13 +36,12 @@ type Node struct {
 	Next      []*Node
 }
 
-func (n *Node) newNode(key *string, value *[]byte, level int) {
+func (n *Node) newNode(key *string, value *[]byte, level int, timestamp int64) {
 	n.Key = *key
 	n.Value = *value
-	Time := time.Now().Unix()
-	timeStamp := make([]byte, 16)
-	binary.LittleEndian.PutUint64(timeStamp, uint64(Time))
-	n.TimeStamp = timeStamp
+	timeStampBin := make([]byte, 16)
+	binary.LittleEndian.PutUint64(timeStampBin, uint64(timestamp))
+	n.TimeStamp = timeStampBin
 	n.Next = make([]*Node, level+1, level+1)
 	n.Tombstone = false
 }
@@ -51,7 +49,7 @@ func (n *Node) newNode(key *string, value *[]byte, level int) {
 func (s *SkipList) NewSkipList() {
 	Head := Node{}
 	l := []byte(emptyString)
-	Head.newNode(&emptyString, &l, 0)
+	Head.newNode(&emptyString, &l, 0, 0)
 	s.Head = &Head
 	s.MaxHeight = MAX_HEIGHT // Takodje specificirano kroz konfiguracioni fajl
 	s.height = 0             // Najveca visina koju lista trenutno poseduje
@@ -67,7 +65,7 @@ func (s *SkipList) SetCapacity(c uint64) {
 }
 
 // Insert : Dodavanje elementa u skiplistu
-func (s *SkipList) Insert(key string, value []byte) *SkipList {
+func (s *SkipList) Insert(key string, value []byte, timestamp int64) *SkipList {
 	update := make([]*Node, s.MaxHeight+1)
 	current := s.Head
 	// Prolazak kroz skip listu da pronadjemo kljuc ili mesto gde treba da se ubaci
@@ -91,7 +89,7 @@ func (s *SkipList) Insert(key string, value []byte) *SkipList {
 		}
 
 		newNode := Node{}
-		newNode.newNode(&key, &value, newLevel)
+		newNode.newNode(&key, &value, newLevel, timestamp)
 
 		for i := 0; i <= newLevel; i++ {
 			// Azuriranje referenci
@@ -137,6 +135,26 @@ func (s *SkipList) Find(key string) []byte {
 	current = current.Next[0]
 	if current != nil && current.Key == key && current.Tombstone == false {
 		return current.Value
+	}
+	return nil
+}
+
+// FindNode: The same as Find but insted of the value of Node it returns the whole Node
+// It also returns the Node even if the Tombstone is true
+func (s *SkipList) FindNode(key string) *Node {
+
+	update := make([]*Node, s.MaxHeight+1)
+	current := s.Head
+	// Prolazak kroz skip listu da pronadjemo kljuc
+	for i := s.height; i >= 0; i-- {
+		for current.Next[i] != nil && current.Next[i].Key < key {
+			current = current.Next[i]
+		}
+		update[i] = current
+	}
+	current = current.Next[0]
+	if current != nil && current.Key == key {
+		return current
 	}
 	return nil
 }

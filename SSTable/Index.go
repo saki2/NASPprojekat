@@ -63,6 +63,7 @@ func ReadIndex(path string, key string, offset int64) int64 {
 
 }
 
+//PrintIndex used for debugging
 func PrintIndex(path string) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0700)
 	Panic(err)

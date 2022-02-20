@@ -10,14 +10,21 @@ const (
 )
 
 type Pair struct {
-	Key 	string
-	Value 	[]byte
+	Key   string
+	Value Information
 }
 
 type Cache struct {
-	capacity		int
-	data			*list.List					// Lista cuva par kljuc-vrednost, najskoriji element je na kraju
-	dataMap			map[string]*list.Element	// Kljuc i pokazivac na element u listi
+	capacity int
+	data     *list.List               // Lista cuva par kljuc-vrednost, najskoriji element je na kraju
+	dataMap  map[string]*list.Element // Kljuc i pokazivac na element u listi
+}
+
+type Information struct {
+	Key       string
+	Value     []byte
+	Timestamp uint64
+	Tombstone bool
 }
 
 // NewCache : Konstruktor LRU cache sa default kapacitetom
@@ -35,24 +42,24 @@ func (cache *Cache) SetCapacity(c int) {
 }
 
 // Find : Trazenje podatka u kesu - vraca vrednost ili nil i bool da li je uspesno nadjen
-func (cache *Cache) Find(key string) ([]byte, bool) {
+func (cache *Cache) Find(key string) (*Information, bool) {
 	listItem, found := cache.dataMap[key]
 	if found {
 		p := listItem.Value.(Pair)
-		return p.Value, true
+		return &p.Value, true
 	} else {
 		return nil, false
 	}
 }
 
 // Add : Dodavanje elementa u kes
-func (cache *Cache) Add(key string, value []byte) {
-	p := Pair{key, value}
+func (cache *Cache) Add(key string, info Information) {
+	p := Pair{key, info}
 	listItem, found := cache.dataMap[p.Key]
 	if found {
 		cache.data.MoveToBack(listItem)
-	} else {	// Element se ne nalazi u kesu
-		if cache.data.Len()+1 <= cache.capacity {	// Kes nije popunjen
+	} else { // Element se ne nalazi u kesu
+		if cache.data.Len()+1 <= cache.capacity { // Kes nije popunjen
 			cache.data.PushBack(p)
 		} else {
 			// Kes je popunjen i uklanja se prvi element iz liste (i recnika) - onaj kome se davno pristupalo
@@ -71,5 +78,3 @@ func (cache *Cache) Check() {
 		fmt.Println(e.Value)
 	}
 }
-
-

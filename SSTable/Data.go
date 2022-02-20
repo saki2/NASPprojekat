@@ -83,6 +83,7 @@ func ReadData(path string, key string, offset int64) ([]byte, []byte, []byte, []
 	currentKey := make([]byte, binary.LittleEndian.Uint64(keySize))
 	_, err = br.Read(currentKey)
 	Panic(err)
+	// If the key is not where we expected it to be an error is raised
 	if key == string(currentKey) {
 		value := make([]byte, binary.LittleEndian.Uint64(valueSize))
 		_, err = br.Read(value)

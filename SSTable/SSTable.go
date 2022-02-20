@@ -5,6 +5,7 @@ import (
 	"os"
 	"project/structures/Bloom_Filter"
 	"project/structures/memtable"
+	"project/structures/merkle"
 	"strconv"
 )
 
@@ -65,7 +66,7 @@ func CreateFilesOfSSTable(SSTableDirName string, SSTableDirNumber int) (*os.File
 	Panic(err)
 	filter, err := os.Create("./Data/SSTable/" + SSTableDirName + "/usertable-" + strconv.Itoa(SSTableDirNumber) + "-Filter.db")
 	Panic(err)
-	metaData, err := os.Create("./Data/SSTable/" + SSTableDirName + "/usertable-" + strconv.Itoa(SSTableDirNumber) + "-Metadata.db")
+	metaData, err := os.Create("./Data/SSTable/" + SSTableDirName + "/usertable-" + strconv.Itoa(SSTableDirNumber) + "-Metadata.txt")
 	Panic(err)
 	summary, err := os.Create("./Data/SSTable/" + SSTableDirName + "/usertable-" + strconv.Itoa(SSTableDirNumber) + "-Summary.db")
 	Panic(err)
@@ -117,6 +118,10 @@ func Flush(s *memtable.SkipList) {
 
 	summaryStruct.firstKey = node.Key
 
+	// Creating an array of values to be put in the merkle tree
+	hashVal := make([][20]byte, s.Capacity)
+	i := 0 // index of hashVal
+
 	for node != nil {
 		// Turn the element into a binary array and write it into the Data file
 		binData := DataSegmentToBinary(node)
@@ -128,14 +133,15 @@ func Flush(s *memtable.SkipList) {
 		binIndex := IndexSegmentToBinary(node.Key, dataOffset)
 		_, err = index.Write(binIndex)
 		Panic(err)
-
+		// After we write the element into the data segment, we increase the data offset by its size
 		dataOffset += len(binData)
 
 		summaryStruct.elements[node.Key] = indexOffset
-
+		// After we write the element into the Index segment, we increase the index offset by its size
 		indexOffset += len(binIndex)
 
-		// After we write the element into the data segment, we increase the offset by its size
+		hashVal[i] = merkle.Hash(node.Value)
+		i++
 
 		nodeNext := node.Next[0]
 		// Writing the last element of the index into the summary
@@ -144,7 +150,11 @@ func Flush(s *memtable.SkipList) {
 		}
 		node = nodeNext
 	}
+	// Writing the metadata
+	Root := merkle.BuildTreeLeaf(hashVal)
+	merkleTree := merkle.MerkleRoot{Root: Root}
+	merkle.PreorderRecursive(merkleTree.Root, metaData)
 
-	bloom_filter.WriteBloomFilter(&bloomFilter, "", filter)
-	WriteSummary(&summaryStruct, summary)
+	bloom_filter.WriteBloomFilter(&bloomFilter, "", filter) // Writing the bloom filter
+	WriteSummary(&summaryStruct, summary)                   // Writing the summary
 }
