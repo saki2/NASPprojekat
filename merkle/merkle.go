@@ -81,20 +81,3 @@ func buildTreeLeaf(parts [][20]byte) *Node {
 	}
 	return buildTree(nodes)
 }
-
-func main(){
-	arr := []string{"This", "is", "the", "first", "tutorial",
-		"of", "Merkle", "tree"}
-	hashVal := make([][20]byte, 8)
-
-	for i:=0; i < len(arr); i++ {
-		hashVal[i] = Hash([]byte(arr[i]))
-	}
-
-	Root := buildTreeLeaf(hashVal)
-	merkle := MerkleRoot{ root: Root}
-
-	merkle.serialize("vezbe7/Metadata.txt")
-
-
-}

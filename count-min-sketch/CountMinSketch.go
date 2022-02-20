@@ -74,11 +74,4 @@ func CreateHashFunctions(k uint) []hash.Hash32 {
 	return h
 }
 
-func main() {
-	CMS := CountMinSketch{}
-	CMS.newCountMinSketch()
 
-	CMS.append("Veljko")
-	fmt.Println(CMS.frequency("Veljko"))
-
-}

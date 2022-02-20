@@ -156,28 +156,4 @@ func Add(key string, value []byte, fileName string) {
 
 }
 
-//f, err := os.OpenFile("file", os.O_RDWR | os.O_CREATE, 0644)
-//fatal(err)
-//defer f.Close()
-//
-//t, _ := read(f)
-// read crc from file
-//fmt.Println(binary.LittleEndian.Uint32(t[:4]))
-//// read time from file
-//fmt.Println(binary.LittleEndian.Uint64(t[4:20]))
-// ....
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

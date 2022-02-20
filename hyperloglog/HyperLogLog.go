@@ -82,21 +82,3 @@ func createHash(stream string) uint32 {
 	return sum
 }
 
-func main() {
-	hll := HyperLogLog{}
-	hll.NewHyperLogLog(HLL_MAX_PRECISION)
-	f, err := os.OpenFile("vezbe4/hyperloglog/testFile.txt", os.O_RDONLY, os.ModePerm)
-	if err != nil {
-		log.Fatalf("open file error: %v", err)
-		return
-	}
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		hll.Add(sc.Text())
-	}
-
-	fmt.Println(hll.Estimate())
-}
-

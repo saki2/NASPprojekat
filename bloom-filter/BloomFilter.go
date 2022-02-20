@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha1"
-	"fmt"
 	"hash"
 	"math"
 	"time"
@@ -65,17 +64,4 @@ func CreateHashFunctions(k uint) []hash.Hash {
 		h = append(h, sha1.New())
 	}
 	return h
-}
-
-func main() {
-	bloomFilter := BloomFilter{}
-	bloomFilter.newBloomFilter()
-
-
-	bloomFilter.append("Veljko")
-	bloomFilter.append("Marija")
-	bloomFilter.append("Jelena")
-	fmt.Println(bloomFilter.isContain("Mara"))
-
-
 }

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var stopWords = []string{"i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"}
+
 
 
 type SimHash struct {
@@ -116,28 +116,3 @@ func (simHash *SimHash) RemovePunctuation() {
 
 }
 
-func main() {
-
-	file, err := os.Open("sim-hash/files/tekst1.txt")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Scan()
-
-	file2, err := os.Open("sim-hash/files/tekst2.txt")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer file2.Close()
-	scanner2 := bufio.NewScanner(file2)
-	scanner2.Scan()
-
-	sh := SimHash{scanner.Text(), nil, nil}
-	sh.newSimHash()
-	sh2 := SimHash{scanner2.Text(), nil, nil}
-	sh2.newSimHash()
-	fmt.Println(hammingDistance(sh, sh2))
-
-}
