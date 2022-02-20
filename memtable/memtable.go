@@ -1,52 +1,61 @@
 package memtable
 
 import (
-"fmt"
-"math/rand"
+	"encoding/binary"
+	"fmt"
+	"math/rand"
+	"time"
 )
 
 var emptyString = ""
+
 const (
 	MAX_HEIGHT = 10
 )
 
 type Pair struct {
-	Key 	string
-	Value 	[]byte
+	Key   string
+	Value []byte
 }
 
 type SkipList struct {
 	MaxHeight int
-	height int
-	Size   int
-	head   *Node
-	Capacity uint64
+	height    int
+	Size      int
+	Head      *Node
+	Capacity  uint64
 }
 
 type Node struct {
 	// Elementi su predstavljeni pomocu cvorova
 	// Cvor cuva kljuc, vrednost, tombstone i reference na ostale elemente liste
 	// Cvor se u listi pozicionira na osnovu vrednosti kljuca
-	Key   string
-	Value []byte
+	Key       string
+	Value     []byte
+	TimeStamp []byte
 	Tombstone bool
-	next  []*Node
+	Next      []*Node
 }
 
 func (n *Node) newNode(key *string, value *[]byte, level int) {
 	n.Key = *key
 	n.Value = *value
-	n.next = make([]*Node, level+1, level+1)
+	Time := time.Now().Unix()
+	timeStamp := make([]byte, 16)
+	binary.LittleEndian.PutUint64(timeStamp, uint64(Time))
+	n.TimeStamp = timeStamp
+	n.Next = make([]*Node, level+1, level+1)
 	n.Tombstone = false
 }
 
 func (s *SkipList) NewSkipList() {
-	head := Node{}
+	Head := Node{}
 	l := []byte(emptyString)
-	head.newNode(&emptyString, &l, 0)
-	s.head = &head
-	s.MaxHeight = MAX_HEIGHT	// Takodje specificirano kroz konfiguracioni fajl
-	s.height = 0		// Najveca visina koju lista trenutno poseduje
+	Head.newNode(&emptyString, &l, 0)
+	s.Head = &Head
+	s.MaxHeight = MAX_HEIGHT // Takodje specificirano kroz konfiguracioni fajl
+	s.height = 0             // Najveca visina koju lista trenutno poseduje
+	s.Capacity = 5
 }
 
 func (s *SkipList) SetMaxHeight(h int) {
@@ -58,25 +67,25 @@ func (s *SkipList) SetCapacity(c uint64) {
 }
 
 // Insert : Dodavanje elementa u skiplistu
-func (s *SkipList) Insert(key string, value []byte) {
+func (s *SkipList) Insert(key string, value []byte) *SkipList {
 	update := make([]*Node, s.MaxHeight+1)
-	current := s.head
+	current := s.Head
 	// Prolazak kroz skip listu da pronadjemo kljuc ili mesto gde treba da se ubaci
-	for i:=s.height ; i >= 0; i-- {
-		for current.next[i]!= nil && current.next[i].Key < key {
-			current = current.next[i]
+	for i := s.height; i >= 0; i-- {
+		for current.Next[i] != nil && current.Next[i].Key < key {
+			current = current.Next[i]
 		}
 		update[i] = current
 	}
-	current = current.next[0]
+	current = current.Next[0]
 
 	// Element nije nadjen po kljucu i moze da se ubaci
 	if current == nil || current.Key != key {
 		newLevel := s.roll()
-		if newLevel > s.height{
-			for i:=s.height+1 ; i <= newLevel ; i++ {
-				s.head.next = append(s.head.next, nil)
-				update[i] = s.head
+		if newLevel > s.height {
+			for i := s.height + 1; i <= newLevel; i++ {
+				s.Head.Next = append(s.Head.Next, nil)
+				update[i] = s.Head
 			}
 			s.height = newLevel
 		}
@@ -84,15 +93,31 @@ func (s *SkipList) Insert(key string, value []byte) {
 		newNode := Node{}
 		newNode.newNode(&key, &value, newLevel)
 
-		for i:=0 ; i<=newLevel ; i++ {
+		for i := 0; i <= newLevel; i++ {
 			// Azuriranje referenci
-			newNode.next[i] = update[i].next[i]
-			update[i].next[i] = &newNode
+			newNode.Next[i] = update[i].Next[i]
+			update[i].Next[i] = &newNode
 		}
 
 		s.Size += 1
+		// Novo
+		// If max capacity is reached we return the skiplist to be flushed on to the disk
+		if uint64(s.Size) >= s.Capacity {
+			return s
+			//
+		}
 
 	}
+	// Novo
+	if current != nil && current.Key == key {
+		fmt.Println(current.Key)
+		fmt.Println(current.Value)
+		fmt.Println(value)
+		current.Value = value
+		fmt.Println(current.Value)
+		//
+	}
+	return nil
 
 }
 
@@ -101,15 +126,15 @@ func (s *SkipList) Insert(key string, value []byte) {
 func (s *SkipList) Find(key string) []byte {
 
 	update := make([]*Node, s.MaxHeight+1)
-	current := s.head
+	current := s.Head
 	// Prolazak kroz skip listu da pronadjemo kljuc
-	for i:=s.height ; i >= 0; i-- {
-		for current.next[i]!= nil && current.next[i].Key < key {
-			current = current.next[i]
+	for i := s.height; i >= 0; i-- {
+		for current.Next[i] != nil && current.Next[i].Key < key {
+			current = current.Next[i]
 		}
 		update[i] = current
 	}
-	current = current.next[0]
+	current = current.Next[0]
 	if current != nil && current.Key == key && current.Tombstone == false {
 		return current.Value
 	}
@@ -121,15 +146,15 @@ func (s *SkipList) Find(key string) []byte {
 func (s *SkipList) Delete(key string) bool {
 
 	update := make([]*Node, s.MaxHeight+1)
-	current := s.head
+	current := s.Head
 	// Prolazak kroz skip listu da pronadjemo kljuc
-	for i:=s.height ; i >= 0; i-- {
-		for current.next[i]!= nil && current.next[i].Key < key {
-			current = current.next[i]
+	for i := s.height; i >= 0; i-- {
+		for current.Next[i] != nil && current.Next[i].Key < key {
+			current = current.Next[i]
 		}
 		update[i] = current
 	}
-	current = current.next[0]
+	current = current.Next[0]
 	if current != nil && current.Key == key && current.Tombstone == false {
 		current.Tombstone = true
 		return true
@@ -137,22 +162,20 @@ func (s *SkipList) Delete(key string) bool {
 	return false
 }
 
-
 // ExtractData : Vraca listu referenci na parove kljuc-vrednost
 func (s *SkipList) ExtractData() []*Pair {
-	h := s.head
+	h := s.Head
 	list := []*Pair{}
 
-	for h.next[0] != nil {
-		if h.next[0].Tombstone == false {
-			p := Pair{h.next[0].Key, h.next[0].Value}
+	for h.Next[0] != nil {
+		if h.Next[0].Tombstone == false {
+			p := Pair{h.Next[0].Key, h.Next[0].Value}
 			list = append(list, &p)
 		}
-		h = h.next[0]
+		h = h.Next[0]
 	}
 	return list
 }
-
 
 func (s *SkipList) roll() int {
 	level := 0 // alwasy start from level 0
@@ -171,12 +194,25 @@ func (s *SkipList) roll() int {
 }
 
 func (s *SkipList) PrintList() {
-	for i:=0; i<=s.height ; i++ {
+	for i := 0; i <= s.height; i++ {
 		fmt.Println("nivo", i)
-		node := s.head.next[i]
-		for node!=nil{
+		node := s.Head.Next[i]
+		for node != nil {
 			fmt.Println(node.Key)
-			node = node.next[i]
+			node = node.Next[i]
 		}
 	}
+}
+
+func (s *SkipList) PrintElements() {
+	node := s.Head.Next[0]
+	for node != nil {
+		data := binary.BigEndian.Uint64(node.TimeStamp)
+		fmt.Println("Key: \"", node.Key, "\"; Value: \"", string(node.Value), "\"; TimeStamp: ", data)
+		node = node.Next[0]
+	}
+}
+
+func (s *SkipList) Flush() *SkipList {
+	return s
 }
