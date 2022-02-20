@@ -1,0 +1,2 @@
+Capacity=1000
+MaxHeight=10
