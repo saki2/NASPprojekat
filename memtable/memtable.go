@@ -6,11 +6,17 @@ import (
 	"math/rand"
 )
 
-var emptyString = ""
+var (
+	emptyString = ""
+	MAX_HEIGHT int
+	CAPACITY uint64
+)
 
 const (
-	MAX_HEIGHT = 10
+	DEFAULT_MAX_HEIGHT = 10
+	DEFAULT_CAPACITY = 100
 )
+
 
 type Pair struct {
 	Key   string
@@ -26,9 +32,7 @@ type SkipList struct {
 }
 
 type Node struct {
-	// Elementi su predstavljeni pomocu cvorova
-	// Cvor cuva kljuc, vrednost, tombstone i reference na ostale elemente liste
-	// Cvor se u listi pozicionira na osnovu vrednosti kljuca
+	// Elements are represented by nodes
 	Key       string
 	Value     []byte
 	TimeStamp []byte
@@ -46,14 +50,20 @@ func (n *Node) newNode(key *string, value *[]byte, level int, timestamp int64) {
 	n.Tombstone = false
 }
 
+func SetDefaultParam() {
+	CAPACITY = DEFAULT_CAPACITY
+	MAX_HEIGHT = DEFAULT_MAX_HEIGHT
+}
+
 func (s *SkipList) NewSkipList() {
 	Head := Node{}
 	l := []byte(emptyString)
 	Head.newNode(&emptyString, &l, 0, 0)
 	s.Head = &Head
-	s.MaxHeight = MAX_HEIGHT // Takodje specificirano kroz konfiguracioni fajl
-	s.height = 0             // Najveca visina koju lista trenutno poseduje
-	s.Capacity = 5
+	s.MaxHeight = MAX_HEIGHT
+	s.height = 0
+	s.Capacity = CAPACITY
+	s.Size = 0
 }
 
 func (s *SkipList) SetMaxHeight(h int) {
@@ -64,11 +74,11 @@ func (s *SkipList) SetCapacity(c uint64) {
 	s.Capacity = c
 }
 
-// Insert : Dodavanje elementa u skiplistu
+// Insert : Adding or updating element
+// Returns skiplist to be flushed on disk when at capacity
 func (s *SkipList) Insert(key string, value []byte, timestamp int64) *SkipList {
 	update := make([]*Node, s.MaxHeight+1)
 	current := s.Head
-	// Prolazak kroz skip listu da pronadjemo kljuc ili mesto gde treba da se ubaci
 	for i := s.height; i >= 0; i-- {
 		for current.Next[i] != nil && current.Next[i].Key < key {
 			current = current.Next[i]
@@ -77,7 +87,7 @@ func (s *SkipList) Insert(key string, value []byte, timestamp int64) *SkipList {
 	}
 	current = current.Next[0]
 
-	// Element nije nadjen po kljucu i moze da se ubaci
+	// Element not found by key, can be inserted
 	if current == nil || current.Key != key {
 		newLevel := s.roll()
 		if newLevel > s.height {
@@ -91,41 +101,37 @@ func (s *SkipList) Insert(key string, value []byte, timestamp int64) *SkipList {
 		newNode := Node{}
 		newNode.newNode(&key, &value, newLevel, timestamp)
 
+		// Updating references
 		for i := 0; i <= newLevel; i++ {
-			// Azuriranje referenci
 			newNode.Next[i] = update[i].Next[i]
 			update[i].Next[i] = &newNode
 		}
 
 		s.Size += 1
-		// Novo
-		// If max capacity is reached we return the skiplist to be flushed on to the disk
+		// If max capacity is reached, skiplist is returned to be flushed on to the disk
 		if uint64(s.Size) >= s.Capacity {
 			return s
 			//
 		}
 
 	}
-	// Novo
+
+	// Element found by key, to be updated
 	if current != nil && current.Key == key {
-		fmt.Println(current.Key)
-		fmt.Println(current.Value)
-		fmt.Println(value)
 		current.Value = value
-		fmt.Println(current.Value)
-		//
+		timeStamp := make([]byte, 16)
+		binary.LittleEndian.PutUint64(timeStamp, uint64(timestamp))
+		current.TimeStamp = timeStamp
 	}
 	return nil
 
 }
 
-// Find : Trazenje elementa u listi po vrednosti kljuca
-// Vraca vrednost koja se nalazi pod tim kljucem
+// Find : Returns value of the element found by key
 func (s *SkipList) Find(key string) []byte {
 
 	update := make([]*Node, s.MaxHeight+1)
 	current := s.Head
-	// Prolazak kroz skip listu da pronadjemo kljuc
 	for i := s.height; i >= 0; i-- {
 		for current.Next[i] != nil && current.Next[i].Key < key {
 			current = current.Next[i]
@@ -159,8 +165,7 @@ func (s *SkipList) FindNode(key string) *Node {
 	return nil
 }
 
-// Delete : Logicko brisanje
-// Ukoliko je element nadjen u listi pod zadatim kljucem tombstone se postavlja na true
+// Delete : Logical, if element exists by key tombstone is set to true
 func (s *SkipList) Delete(key string) bool {
 
 	update := make([]*Node, s.MaxHeight+1)
@@ -196,7 +201,7 @@ func (s *SkipList) ExtractData() []*Pair {
 }
 
 func (s *SkipList) roll() int {
-	level := 0 // alwasy start from level 0
+	level := 0 // always start from level 0
 
 	// We roll until we don't get 1 from rand function and we did not
 	// outgrow maxHeight. BUT rand can give us 0, and if that is the case

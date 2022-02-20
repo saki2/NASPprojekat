@@ -1,0 +1,9 @@
+{
+  "WalSegmentSize": 3,
+  "MemtableCapacity": 3,
+  "MemtableMaxHeight": 10,
+  "BloomFalsePositiveRate": 0.04,
+  "LRUCapacity": 3,
+  "MaxRequestPerInterval": 4,
+  "Interval": 14
+}

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"time"
+
 )
 
 /*
@@ -30,12 +31,24 @@ const (
 	TOMBSTONE_SIZE = CRC_SIZE + 1
 	KEY_SIZE       = TOMBSTONE_SIZE + T_SIZE
 	VALUE_SIZE     = KEY_SIZE + T_SIZE
+
+	DEFAULT_SEGMENT_SIZE = 100
 )
+
+var SEGMENT_SIZE uint64
+
+func SetDefaultParam() {
+	SEGMENT_SIZE = uint64(DEFAULT_SEGMENT_SIZE)
+}
 
 
 func  CRC32(data []byte) uint32 {
 	return crc32.ChecksumIEEE(data)
 
+}
+
+type WalSegment struct {
+	NumElements int
 }
 
 
@@ -116,7 +129,7 @@ func fatal(err error) {
 	}
 }
 
-func Add(key string, value []byte, fileName string) {
+func Add(key string, value []byte, fileName string) error {
 	f, err := os.OpenFile(fileName, os.O_RDWR | os.O_CREATE, 0644)
 	fatal(err)
 	defer f.Close()
@@ -150,10 +163,11 @@ func Add(key string, value []byte, fileName string) {
 	temp = append(temp, []byte(key)...)
 	temp = append(temp, value...)
 
-	_ = Append(f, temp)
-	f.Close()
-
+	err = Append(f, temp)
+	return err
 
 }
+
+
 
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+var CAPACITY int
+
 const (
 	DEFAULT_CAPACITY = 10
 )
@@ -16,8 +18,8 @@ type Pair struct {
 
 type Cache struct {
 	capacity int
-	data     *list.List               // Lista cuva par kljuc-vrednost, najskoriji element je na kraju
-	dataMap  map[string]*list.Element // Kljuc i pokazivac na element u listi
+	data     *list.List       // Contains Pair objects, sorted by least recently used to most recently
+	dataMap  map[string]*list.Element
 }
 
 type Information struct {
@@ -27,21 +29,23 @@ type Information struct {
 	Tombstone bool
 }
 
-// NewCache : Konstruktor LRU cache sa default kapacitetom
 func NewCache() *Cache {
 	c := new(Cache)
-	c.capacity = DEFAULT_CAPACITY
+	c.capacity = CAPACITY
 	c.dataMap = make(map[string]*list.Element)
 	c.data = list.New()
 	return c
 }
 
-// SetCapacity : Podesavanje kapaciteta
-func (cache *Cache) SetCapacity(c int) {
-	cache.capacity = c
+func SetDefaultParam() {
+	CAPACITY = DEFAULT_CAPACITY
 }
 
-// Find : Trazenje podatka u kesu - vraca vrednost ili nil i bool da li je uspesno nadjen
+func (cache *Cache) PrintCapacity(){
+	fmt.Println(cache.capacity)
+}
+
+// Find : Returns Information object or nil and bool depending on whether the element was found by key
 func (cache *Cache) Find(key string) (*Information, bool) {
 	listItem, found := cache.dataMap[key]
 	if found {
@@ -52,17 +56,16 @@ func (cache *Cache) Find(key string) (*Information, bool) {
 	}
 }
 
-// Add : Dodavanje elementa u kes
 func (cache *Cache) Add(key string, info Information) {
 	p := Pair{key, info}
 	listItem, found := cache.dataMap[p.Key]
 	if found {
 		cache.data.MoveToBack(listItem)
-	} else { // Element se ne nalazi u kesu
-		if cache.data.Len()+1 <= cache.capacity { // Kes nije popunjen
+	} else { // Element not in cache
+		if cache.data.Len()+1 <= cache.capacity { // Cache not up to capacity
 			cache.data.PushBack(p)
 		} else {
-			// Kes je popunjen i uklanja se prvi element iz liste (i recnika) - onaj kome se davno pristupalo
+			// Cache at full capacity - least recent element is removed from cache
 			rem := cache.data.Front()
 			delete(cache.dataMap, rem.Value.(Pair).Key)
 			cache.data.Remove(rem)

@@ -9,12 +9,18 @@ import (
 	"time"
 )
 
-const FALSE_POSITIVE_RATE = 0.05
+const DEFAULT_FALSE_POSITIVE_RATE = 0.05
+
+var FALSE_POSITIVE_RATE float64
 
 type BloomFilter struct {
 	M, K          uint     // Size of bloom filter and number of hash functions
 	HashFunctions []uint32 // array of hashes
 	Data          []byte   // Data array
+}
+
+func SetDefaultParam() {
+	FALSE_POSITIVE_RATE = DEFAULT_FALSE_POSITIVE_RATE
 }
 
 func Panic(err error) {
