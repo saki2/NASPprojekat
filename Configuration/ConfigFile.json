@@ -4,6 +4,7 @@
   "MemtableMaxHeight": 10,
   "BloomFalsePositiveRate": 0.04,
   "LRUCapacity": 3,
+  "LSMMaxLevel": 4,
   "MaxRequestPerInterval": 4,
   "Interval": 14
 }

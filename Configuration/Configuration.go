@@ -18,6 +18,8 @@ type Configuration struct {
 
 	LRUCapacity int						`json:"LRUCapacity"`
 
+	LSMMaxLevel int						`json:"LSMMaxLevel"`
+
 	MaxRequestPerInterval int			`json:"MaxRequestPerInterval"`
 	Interval int64						`json:"Interval"`
 
@@ -36,6 +38,10 @@ func LoadConfig() *Configuration {
 		return nil
 	}
 	return &config
+}
+
+func SetConfig() {
+
 }
 
 func (config *Configuration) Check() {

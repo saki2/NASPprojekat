@@ -80,6 +80,17 @@ func (cache *Cache) Add(key string, info Information) {
 
 }
 
+func (cache *Cache) Update(key string, value []byte, time uint64, tombstone bool) {
+	listItem, found := cache.dataMap[key]
+	if found {
+		pair := listItem.Value.(Pair)
+		inf := pair.Value
+		inf.Value = value
+		inf.Timestamp = time
+		inf.Tombstone = tombstone
+	}
+}
+
 func (cache *Cache) Check() {
 	for e := cache.data.Front(); e != nil; e = e.Next() {
 		fmt.Println(e.Value)

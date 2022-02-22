@@ -16,8 +16,8 @@ import (
 "d" = delete
 */
 
-func Create(mem *memtable.SkipList, key string, value []byte, SegmentNumElements *uint64) {
-	WritePath.WritePath(mem, key, value, SegmentNumElements)
+func Create(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte, SegmentNumElements *uint64) {
+	WritePath.WritePath(mem, cache, key, value, SegmentNumElements)
 }
 
 func Read(mem *memtable.SkipList, cache *lru.Cache, key string) *ReadPath.ElementInfo {
@@ -25,8 +25,8 @@ func Read(mem *memtable.SkipList, cache *lru.Cache, key string) *ReadPath.Elemen
 	return element
 }
 
-func Update(mem *memtable.SkipList, key string, value []byte, SegmentNumElements *uint64) {
-	WritePath.WritePath(mem, key, value, SegmentNumElements)
+func Update(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte, SegmentNumElements *uint64) {
+	WritePath.WritePath(mem, cache, key, value, SegmentNumElements)
 }
 
 func Delete(mem *memtable.SkipList, key string) *memtable.SkipList {
