@@ -107,17 +107,13 @@ func meni(mem *memtable.SkipList, cache *lru.Cache, tb *TokenBucket.TokenBucket)
 			if Now()-tb.LastReset >= tb.Interval {	// Interval has passed, counters are reset
 				tb.LastReset = Now()
 				tb.AvailableReq = tb.MaxReq
-				fmt.Println("Interval reset")
 				ReadUserInput(mem, cache)
 				tb.AvailableReq -= 1
-			} else {
+			} else {	// In interval
 				if tb.AvailableReq-1 > 0 {
-					fmt.Println("In interval")
 					ReadUserInput(mem, cache)
 					tb.AvailableReq -= 1
-				} else {
-					fmt.Println("Too many requests for the set time interval")
-				}
+				} // else : Too many requests for the set time interval
 			}
 			ReadUserInput(mem, cache)
 		} else if choice == "3" {

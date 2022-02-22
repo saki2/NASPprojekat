@@ -1,7 +1,6 @@
 package CRUD
 
 import (
-	"fmt"
 	"project/structures/LSM"
 	"project/structures/ReadPath"
 	"project/structures/SSTable"
@@ -37,12 +36,10 @@ func Delete(mem *memtable.SkipList, cache *lru.Cache, key string) bool {
 	if WritePath.SegmentElements > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
 		WritePath.CreateLogFile()
 		WritePath.SegmentElements = 0
-		fmt.Println("wal segment at capacity, segmentelements", WritePath.SegmentElements)
 	}
 	err := wal.Add(key, []byte(""), WritePath.WalSegmentName, true)
 	if err == nil { 		// Commit log confirmed entry
 		WritePath.SegmentElements += 1
-		fmt.Println("segmentelements + 1 =", WritePath.SegmentElements)
 		_, found := cache.Find(key)
 		if found {
 			cache.Update(key, []byte(""), uint64(time.Now().Unix()), true)
