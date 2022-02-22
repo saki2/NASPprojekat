@@ -24,7 +24,7 @@ func (c *CountMinSketch) newCountMinSketch() {
 	for i := range c.Table {
 		c.Table[i] = make([]uint, c.M)
 	}
-	
+
 }
 
 func hash_(s string) uint32 {
@@ -44,7 +44,6 @@ func (c *CountMinSketch) append(key string)  {
 		j:= uint(sum) % c.M
 		c.Table[i][j] += 1
 	}
-
 }
 
 func (c *CountMinSketch) frequency(key string) uint {

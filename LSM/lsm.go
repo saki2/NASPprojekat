@@ -11,7 +11,12 @@ import (
 	"strconv"
 )
 
-const MAX_LEVEL = 5
+const DEFAULT_MAX_LEVEL = 5
+var MAX_LEVEL int
+
+func SetDefaultParam() {
+	MAX_LEVEL = DEFAULT_MAX_LEVEL
+}
 
 func Panic(err error) {
 	if err != nil {
