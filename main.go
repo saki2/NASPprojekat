@@ -101,7 +101,7 @@ func meni(mem *memtable.SkipList, cache *lru.Cache, SegmentNumElements *uint64) 
 		if choice == "1" {
 			fmt.Println("The file should be the following format: CRUD COMMAND|KEY|VALUE")
 			fmt.Println("Example: d|Mango|/ ; c|Papaya|Orange")
-			fmt.Println("Input the file path or X to return: \n>> "
+			fmt.Println("Input the file path or X to return: \n>> ")
 			var path string
 			fmt.Scanln(&path)
 			if path == "x" || path == "X"{
