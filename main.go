@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"project/structures/Bloom_Filter"
 	"project/structures/Configuration"
+	"project/structures/Initialization"
+	"project/structures/LSM"
 	"project/structures/WritePath"
 	"project/structures/lru"
 	"project/structures/memtable"
@@ -13,9 +15,8 @@ import (
 
 const (
 	DEFAULT_MAX_REQUEST = 20
-	DEFAULT_INTERVAL = 10
+	DEFAULT_INTERVAL    = 10
 )
-
 
 func main() {
 
@@ -31,25 +32,35 @@ func main() {
 		memtable.MAX_HEIGHT = config.MemtableMaxHeight
 		bloom_filter.FALSE_POSITIVE_RATE = config.BloomFalsePositiveRate
 		lru.CAPACITY = config.LRUCapacity
+		LSM.MAX_LEVEL = config.LSMMaxLevel
 		maxreq = config.MaxRequestPerInterval
 		interval = config.Interval
-	} else {	// Configurational file is non-existent, resort to default values
+	} else { // Configurational file is non-existent, resort to default values
 		wal.SetDefaultParam()
 		memtable.SetDefaultParam()
 		bloom_filter.SetDefaultParam()
 		lru.SetDefaultParam()
+		LSM.SetDefaultParam()
 		maxreq = DEFAULT_MAX_REQUEST
 		interval = DEFAULT_INTERVAL
 	}
 
-	WritePath.CreateLogFile()
+	Initialization.CreateDataFiles()
+
 	memtableInstance := memtable.SkipList{}
 	memtableInstance.NewSkipList()
 	//cache := lru.NewCache()
 
+	WritePath.WalSegmentName = wal.ScanWal(&memtableInstance)
+	if memtableInstance.Size == 0 {
+		WritePath.CreateLogFile()
+	} else {
+		//segmentNumElem = uint64(wal.CalculateSegmentSize(WritePath.WalSegmentName))
+	}
+
 	lastReset := Now()
 	availableReq := maxreq
-	if Now()-lastReset >= interval {	// Interval has passed, counters are reset
+	if Now()-lastReset >= interval { // Interval has passed, counters are reset
 		lastReset = Now()
 		availableReq = maxreq
 		fmt.Println("Interval reset")
