@@ -32,6 +32,10 @@ type ElementInfo struct {
 }
 
 func PrintElement(element *ElementInfo) {
+	if element != nil {
+		fmt.Println("Key not found")
+		return
+	}
 	fmt.Print("CRC: " + strconv.Itoa(int(element.CRC)))
 	fmt.Print("; Timestamp: " + strconv.Itoa(int(element.Timestamp)))
 	if element.Tombstone == true {
@@ -189,7 +193,9 @@ func ReadPath(memtable *memtable.SkipList, cache *lru.Cache, key string) *Elemen
 	}
 
 	// If the element is not found in ANY SSTable we return nil
-	cache.Add(key, *cacheElement)
+	if foundElement != nil {
+		cache.Add(key, *cacheElement)
+	}
 	return foundElement
 
 }
