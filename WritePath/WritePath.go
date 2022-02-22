@@ -1,6 +1,7 @@
 package WritePath
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"project/structures/SSTable"
@@ -12,16 +13,19 @@ import (
 )
 
 var WalSegmentName string  // Path to current Wal segment that gets appended
+var SegmentElements uint64   // Number of elements in current Wal segment
 
-func WritePath(memtable *memtable.SkipList, cache *lru.Cache, key string, value []byte, SegmentNumElements *uint64) {
+func WritePath(memtable *memtable.SkipList, cache *lru.Cache, key string, value []byte) {
 
-	if *SegmentNumElements+1 > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
+	if SegmentElements+1 > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
 		CreateLogFile()
-		*SegmentNumElements = 0
+		SegmentElements = 0
+		fmt.Println("wal segment at capacity, segmentelements", SegmentElements)
 	}
 	err := wal.Add(key, value, WalSegmentName, false)
 	if err == nil { 		// Commit log confirmed entry
-		*SegmentNumElements += 1
+		SegmentElements += 1
+		fmt.Println("segmentelements + 1 =", SegmentElements)
 		_, found := cache.Find(key)
 		if found {
 			cache.Update(key, value, uint64(time.Now().Unix()), false)

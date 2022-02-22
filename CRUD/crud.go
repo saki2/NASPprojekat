@@ -1,6 +1,7 @@
 package CRUD
 
 import (
+	"fmt"
 	"project/structures/LSM"
 	"project/structures/ReadPath"
 	"project/structures/SSTable"
@@ -18,8 +19,8 @@ import (
 "d" = delete
 */
 
-func Create(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte, SegmentNumElements *uint64) {
-	WritePath.WritePath(mem, cache, key, value, SegmentNumElements)
+func Create(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte) {
+	WritePath.WritePath(mem, cache, key, value)
 }
 
 func Read(mem *memtable.SkipList, cache *lru.Cache, key string) *ReadPath.ElementInfo {
@@ -27,19 +28,21 @@ func Read(mem *memtable.SkipList, cache *lru.Cache, key string) *ReadPath.Elemen
 	return element
 }
 
-func Update(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte, SegmentNumElements *uint64) {
-	WritePath.WritePath(mem, cache, key, value, SegmentNumElements)
+func Update(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte) {
+	WritePath.WritePath(mem, cache, key, value)
 }
 
-func Delete(mem *memtable.SkipList, cache *lru.Cache, key string, SegmentNumElements *uint64) bool {
+func Delete(mem *memtable.SkipList, cache *lru.Cache, key string) bool {
 
-	if *SegmentNumElements+1 > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
+	if WritePath.SegmentElements > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
 		WritePath.CreateLogFile()
-		*SegmentNumElements = 0
+		WritePath.SegmentElements = 0
+		fmt.Println("wal segment at capacity, segmentelements", WritePath.SegmentElements)
 	}
 	err := wal.Add(key, []byte(""), WritePath.WalSegmentName, true)
 	if err == nil { 		// Commit log confirmed entry
-		*SegmentNumElements += 1
+		WritePath.SegmentElements += 1
+		fmt.Println("segmentelements + 1 =", WritePath.SegmentElements)
 		_, found := cache.Find(key)
 		if found {
 			cache.Update(key, []byte(""), uint64(time.Now().Unix()), true)

@@ -2,68 +2,38 @@ package main
 
 import (
 	"fmt"
-	"project/structures/Bloom_Filter"
-	"project/structures/Configuration"
 	"project/structures/Initialization"
-	"project/structures/LSM"
+	"project/structures/TokenBucket"
 	"project/structures/WritePath"
-	"project/structures/lru"
 	"project/structures/memtable"
 	wal "project/structures/mmap"
 	"time"
 )
 
-const (
-	DEFAULT_MAX_REQUEST = 20
-	DEFAULT_INTERVAL = 10
-)
-
 
 func main() {
 
-	var maxreq int
-	var interval int64
-	//segmentNumElem := uint64(0)
-
-	config := Configuration.LoadConfig()
-	// Extract configuration values
-	if config != nil {
-		wal.SEGMENT_SIZE = config.WalSegmentSize
-		memtable.CAPACITY = config.MemtableCapacity
-		memtable.MAX_HEIGHT = config.MemtableMaxHeight
-		bloom_filter.FALSE_POSITIVE_RATE = config.BloomFalsePositiveRate
-		lru.CAPACITY = config.LRUCapacity
-		LSM.MAX_LEVEL = config.LSMMaxLevel
-		maxreq = config.MaxRequestPerInterval
-		interval = config.Interval
-	} else {	// Configurational file is non-existent, resort to default values
-		wal.SetDefaultParam()
-		memtable.SetDefaultParam()
-		bloom_filter.SetDefaultParam()
-		lru.SetDefaultParam()
-		LSM.SetDefaultParam()
-		maxreq = DEFAULT_MAX_REQUEST
-		interval = DEFAULT_INTERVAL
-	}
-
+	Initialization.Configure()
 	Initialization.CreateDataFiles()
 
 	memtableInstance := memtable.SkipList{}
 	memtableInstance.NewSkipList()
 	//cache := lru.NewCache()
-
+	TokenBucketInstance := TokenBucket.NewTokenBucket()
 	WritePath.WalSegmentName = wal.ScanWal(&memtableInstance)
-	if memtableInstance.Size == 0{
+	if memtableInstance.Size == 0 {		// There is no leftover data from logs
 		WritePath.CreateLogFile()
+		WritePath.SegmentElements = 0
 	} else {
-		//segmentNumElem = uint64(wal.CalculateSegmentSize(WritePath.WalSegmentName))
+		WritePath.SegmentElements = uint64(wal.CalculateSegmentSize(WritePath.WalSegmentName))
+		fmt.Println(WritePath.SegmentElements)
 	}
 
 	lastReset := Now()
-	availableReq := maxreq
-	if Now()-lastReset >= interval {	// Interval has passed, counters are reset
+	availableReq := TokenBucketInstance.MaxReq
+	if Now()-lastReset >= TokenBucketInstance.Interval {	// Interval has passed, counters are reset
 		lastReset = Now()
-		availableReq = maxreq
+		availableReq = TokenBucketInstance.MaxReq
 		fmt.Println("Interval reset")
 		// salje se zahtev
 		availableReq -= 1

@@ -2,7 +2,13 @@ package Initialization
 
 import (
 	"os"
+	bloom_filter "project/structures/Bloom_Filter"
+	"project/structures/Configuration"
 	"project/structures/LSM"
+	"project/structures/TokenBucket"
+	"project/structures/lru"
+	"project/structures/memtable"
+	wal "project/structures/mmap"
 	"strconv"
 )
 
@@ -28,5 +34,34 @@ func CreateDataFiles() {
 				}
 			}
 		}
+	}
+	if _, err := os.Stat("./Wal") ; os.IsNotExist(err) {
+		err := os.Mkdir("./Wal", 0755)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+}
+
+func Configure() {
+	config := Configuration.LoadConfig()
+	// Extract configuration values
+	if config != nil {
+		wal.SEGMENT_SIZE = config.WalSegmentSize
+		memtable.CAPACITY = config.MemtableCapacity
+		memtable.MAX_HEIGHT = config.MemtableMaxHeight
+		bloom_filter.FALSE_POSITIVE_RATE = config.BloomFalsePositiveRate
+		lru.CAPACITY = config.LRUCapacity
+		LSM.MAX_LEVEL = config.LSMMaxLevel
+		TokenBucket.MAX_REQ = config.MaxRequestPerInterval
+		TokenBucket.INTERVAL = config.Interval
+	} else {	// Configurational file is non-existent, resort to default values
+		wal.SetDefaultParam()
+		memtable.SetDefaultParam()
+		bloom_filter.SetDefaultParam()
+		lru.SetDefaultParam()
+		LSM.SetDefaultParam()
+		TokenBucket.MAX_REQ = TokenBucket.DEFAULT_MAX_REQUEST
+		TokenBucket.INTERVAL = TokenBucket.DEFAULT_MAX_REQUEST
 	}
 }

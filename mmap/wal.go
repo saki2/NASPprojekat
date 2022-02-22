@@ -151,7 +151,7 @@ func Add(key string, value []byte, fileName string, ts bool) error {
 	binary.LittleEndian.PutUint64(timeStamp, uint64(Time))
 
 	tombstone := make([]byte, 8)
-	if ts == false{
+	if ts == false {
 		binary.LittleEndian.PutUint64(tombstone, uint64(0))
 	} else {
 		binary.LittleEndian.PutUint64(tombstone, uint64(1))
@@ -178,7 +178,7 @@ func Add(key string, value []byte, fileName string, ts bool) error {
 
 }
 
-// ScanWal : Gathers data from log segments to load in to memtable
+// ScanWal : Gathers data from log segments to load in to memtable, returns path to last log segment
 func ScanWal(memtableInstance *memtable.SkipList) string {
 	files, err := ioutil.ReadDir("./Wal")
 	SSTable.Panic(err)
@@ -191,11 +191,12 @@ func ScanWal(memtableInstance *memtable.SkipList) string {
 		m[num] = fileName
 	}
 	if len(m) > 0 {
-		segmentCounter := 0 // Memtable consists of data from these last segments
-		for i := 1; i <= len(m); i++ {
+		segmentCounter := 0 			// Memtable consists of data from these segments -- they are not to be deleted as they're not flushed yet
+		for i := 1; i <= len(m); i++ {		// Read data from all log segments, add to memtable
 			ReadData("./Wal/"+m[i], memtableInstance, &segmentCounter)
 		}
 		lowWatermark := len(files) - segmentCounter // Index up to which segments are deleted
+		// Last segmentCounter segments are still active
 		if lowWatermark > 0 {
 			for i := 1; i <= lowWatermark; i++ {
 				err := os.Remove("./Wal/" + m[i])
