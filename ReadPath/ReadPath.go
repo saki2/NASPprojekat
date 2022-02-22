@@ -32,7 +32,7 @@ type ElementInfo struct {
 }
 
 func PrintElement(element *ElementInfo) {
-	if element != nil {
+	if element == nil {
 		fmt.Println("Key not found")
 		return
 	}
