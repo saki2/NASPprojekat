@@ -12,8 +12,8 @@ import (
 // Summary
 
 type Summary struct {
-	firstKey, lastKey string
-	elements          map[string]int
+	FirstKey, LastKey string
+	Elements          map[string]int
 }
 
 func WriteSummary(summaryStruct *Summary, file *os.File) {
@@ -25,7 +25,7 @@ func WriteSummary(summaryStruct *Summary, file *os.File) {
 	//| Key Size (8B) | Key (?B) | Offset In Index(8B) |
 	//+---------------+------ ---+---------------------+
 
-	binFirstEl := []byte(summaryStruct.firstKey)
+	binFirstEl := []byte(summaryStruct.FirstKey)
 	firstElSize := make([]byte, 8)
 	binary.LittleEndian.PutUint64(firstElSize, uint64(len(binFirstEl)))
 	size1 := binary.LittleEndian.Uint64(firstElSize) + 8
@@ -36,7 +36,7 @@ func WriteSummary(summaryStruct *Summary, file *os.File) {
 	_, err := file.Write(first)
 	Panic(err)
 
-	binLastEl := []byte(summaryStruct.lastKey)
+	binLastEl := []byte(summaryStruct.LastKey)
 	lastElSize := make([]byte, 8)
 	binary.LittleEndian.PutUint64(lastElSize, uint64(len(binLastEl)))
 	size2 := binary.LittleEndian.Uint64(lastElSize) + 8
@@ -47,7 +47,7 @@ func WriteSummary(summaryStruct *Summary, file *os.File) {
 	_, err = file.Write(last)
 	Panic(err)
 
-	for key, offset := range summaryStruct.elements {
+	for key, offset := range summaryStruct.Elements {
 		binaryInfo := IndexSegmentToBinary(key, offset)
 		_, err = file.Write(binaryInfo)
 		Panic(err)

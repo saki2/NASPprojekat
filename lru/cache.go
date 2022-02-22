@@ -18,7 +18,7 @@ type Pair struct {
 
 type Cache struct {
 	capacity int
-	data     *list.List       // Contains Pair objects, sorted by least recently used to most recently
+	data     *list.List // Contains Pair objects, sorted by least recently used to most recently
 	dataMap  map[string]*list.Element
 }
 
@@ -41,7 +41,7 @@ func SetDefaultParam() {
 	CAPACITY = DEFAULT_CAPACITY
 }
 
-func (cache *Cache) PrintCapacity(){
+func (cache *Cache) PrintCapacity() {
 	fmt.Println(cache.capacity)
 }
 
@@ -50,7 +50,11 @@ func (cache *Cache) Find(key string) (*Information, bool) {
 	listItem, found := cache.dataMap[key]
 	if found {
 		p := listItem.Value.(Pair)
-		return &p.Value, true
+		if p.Value.Tombstone != true {
+			return &p.Value, true
+		} else {
+			return nil, false
+		}
 	} else {
 		return nil, false
 	}
@@ -61,7 +65,7 @@ func (cache *Cache) Add(key string, info Information) {
 	listItem, found := cache.dataMap[p.Key]
 	if found {
 		cache.data.MoveToBack(listItem)
-	} else { // Element not in cache
+	} else {                                      // Element not in cache
 		if cache.data.Len()+1 <= cache.capacity { // Cache not up to capacity
 			cache.data.PushBack(p)
 		} else {

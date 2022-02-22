@@ -40,12 +40,8 @@ func Compactions() {
 			filepath1 := "./Data/SSTable/Level" + strconv.Itoa(i) + "/" + files[x].Name() + "/usertable-" + strconv.Itoa(i) + "-Data.db"
 			// We only need their Data file
 			filepath2 := "./Data/SSTable/Level" + strconv.Itoa(i) + "/" + files[y].Name() + "/usertable-" + strconv.Itoa(i) + "-Data.db"
-			// Finding the name of the new, merged, file that will be created
-			filesUp, err := ioutil.ReadDir("./Data/SSTable/Level" + strconv.Itoa(i+1))
-			Panic(err)
-			newSSTableName := SSTable.FindLargestFile(filesUp)
 			// Starting the process of merging
-			Merge(filepath1, filepath2, newSSTableName, i+1)
+			Merge(filepath1, filepath2, i+1)
 			// When finished we discard the lower level files we no longer need
 			err = os.RemoveAll("./Data/SSTable/Level" + strconv.Itoa(i) + "/" + files[x].Name())
 			Panic(err)
@@ -58,7 +54,7 @@ func Compactions() {
 
 }
 
-func Merge(sstable1Path string, sstable2Path string, newSSTableName string, level int) {
+func Merge(sstable1Path string, sstable2Path string, level int) {
 	// Opens the necessary files
 	sstable1, err := os.OpenFile(sstable1Path, os.O_RDONLY, 0700)
 	Panic(err)
@@ -67,6 +63,7 @@ func Merge(sstable1Path string, sstable2Path string, newSSTableName string, leve
 	Panic(err)
 	defer sstable2.Close()
 	// Create the new files
+	newSSTableName := SSTable.CreateSSTable(2)
 	data, index, TOC, filter, metaData, summary := SSTable.CreateFilesOfSSTable(newSSTableName, level)
 	defer data.Close()
 	defer index.Close()
@@ -76,14 +73,14 @@ func Merge(sstable1Path string, sstable2Path string, newSSTableName string, leve
 	defer summary.Close()
 	SSTable.CreateTOC(level, TOC)
 
-	// We approximate the number of keys found in the new file. Let's say the size of the key + value equals 60 bytes
-	// Each key in the Data file also has +37 bytes of additional info
-	// We divide the sum of number of bytes in each file and divide it by 97 resulting in an approximation of how many keys we will have
+	// We approximate the number of keys found in the new file.
+	// Each key in the Data file also has +37 bytes of additional info disregarding the size of the key and value
+	// We divide the sum of number of bytes in each file and divide it by 37 resulting in an approximation of the maximal number of keys
 	fileInfo1, err := sstable1.Stat()
 	Panic(err)
 	fileInfo2, err := sstable2.Stat()
 	Panic(err)
-	approximatedSize := (fileInfo1.Size()+fileInfo2.Size())/(37+60) + 1
+	approximatedSize := (fileInfo1.Size()+fileInfo2.Size())/37 + 1
 
 	// Creating the bloom filter
 	bloomFilter := bloom_filter.BloomFilter{}
@@ -142,16 +139,16 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 			crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1 = ReadElement(br1)
 			// If we have reached the end of Data1 file we write the rest of the contents of Data2
 			if crc1 == nil {
-				if tombStone1[0] == 0 {
+				if tombStone2[0] == 0 {
 					WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 					i++
 				}
-				Finish(br2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+				Finish(br2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i, string(key2))
 				break
 			}
 		} else if string(key1) > string(key2) {
 			// If element of Data2 is smaller than element of Data1 than that element is written and Data2 is advanced while Data1 remains same
-			if tombStone1[0] == 0 {
+			if tombStone2[0] == 0 {
 				WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 				i++
 			}
@@ -161,7 +158,7 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 					WriteElement(crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 					i++
 				}
-				Finish(br1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+				Finish(br1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i, string(key1))
 				break
 			}
 		} else {
@@ -173,7 +170,7 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 					i++
 				}
 			} else {
-				if tombStone1[0] == 0 {
+				if tombStone2[0] == 0 {
 					WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 					safeKey = string(key2)
 					i++
@@ -184,11 +181,11 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 			crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2 = ReadElement(br2)
 			if crc1 == nil && crc2 != nil {
 				// If we reached the end of Data1 file, rest of Data2 file is written
-				if tombStone1[0] == 0 {
+				if tombStone2[0] == 0 {
 					WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 					i++
 				}
-				Finish(br2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+				Finish(br2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i, string(key2))
 				break
 			} else if crc1 != nil && crc2 == nil {
 				// If we reached the end of Data2 file, rest of Data1 file is written
@@ -196,7 +193,7 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 					WriteElement(crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
 					i++
 				}
-				Finish(br1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+				Finish(br1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i, string(key1))
 				break
 			} else if crc1 == nil && crc2 == nil {
 				// If we reached the end of Data1 file AND the end of Data2 file, the loop is finished and the last
@@ -228,8 +225,13 @@ func WriteElement(crc, timeStamp, tombStone, keySize, valueSize, key, value []by
 
 }
 
-func Finish(br *bufio.Reader, data, index *os.File, bloomFilter *bloom_filter.BloomFilter, hashVal *[][20]byte, summary *SSTable.Summary, dataOffset, indexOffset *int, i int) {
+func Finish(br *bufio.Reader, data, index *os.File, bloomFilter *bloom_filter.BloomFilter, hashVal *[][20]byte, summary *SSTable.Summary, dataOffset, indexOffset *int, i int, lasKey string) {
 	var err error
+	_, err = br.Peek(4)
+	if err != nil {
+		summary.LastKey = lasKey
+	}
+
 	for err == nil {
 		crc, timeStamp, tombStone, keySize, valueSize, key, value := ReadElement(br)
 		// When we reach the end of the file we break the loop

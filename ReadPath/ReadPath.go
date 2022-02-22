@@ -5,13 +5,17 @@ import (
 	"hash/crc32"
 	"io/ioutil"
 	"project/structures/Bloom_Filter"
+	"project/structures/LSM"
 	"project/structures/SSTable"
 	"project/structures/lru"
 	"project/structures/memtable"
+	"strconv"
 )
 
 func Panic(err error) {
-	panic(err.Error())
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
 // If key is found ElementInfo will be returned from ReadPath call
@@ -51,9 +55,9 @@ func CheckMemtable(sl *memtable.SkipList, key string) (*ElementInfo, *lru.Inform
 	return nil, nil
 }
 
-func CheckCache(c *lru.Cache, key string)  *ElementInfo{
+func CheckCache(c *lru.Cache, key string) *ElementInfo {
 	element, found := c.Find(key)
-	if found{
+	if found {
 		// If key is found inside Cache it is brought to the beginning of the Cache
 		c.Add(key, *element)
 		// ElementInfo object is created based on information from the cache
@@ -66,7 +70,7 @@ func CheckCache(c *lru.Cache, key string)  *ElementInfo{
 		EI.Value = element.Value
 		return &EI
 	}
-	return  nil
+	return nil
 }
 
 func CheckBloomFilter(path, key string) bool {
@@ -86,9 +90,9 @@ func CheckSummary(path, key string) (bool, int64) {
 func CheckIndex(path, key string, offset int64) (bool, int64) {
 	offset2 := SSTable.ReadIndex(path, key, offset)
 	if offset2 != -1 {
-		return true, offset
+		return true, offset2
 	} else {
-		return false, offset
+		return false, offset2
 	}
 }
 
@@ -139,27 +143,31 @@ func ReadPath(memtable *memtable.SkipList, cache *lru.Cache, key string) *Elemen
 	}
 	// If key is not found in the memory we check the SSTables on the disk
 	// A list of all SSTables is created
-	files, err := ioutil.ReadDir("./Data/SSTable")
-	Panic(err)
-	// We go through the list of SSTables
-	for _, file := range files {
-		fileNum := file.Name()[7:] // Get the number of the SSTable
-		// First we load the BloomFilter and check if it MIGHT contain the key
-		if CheckBloomFilter("Data/SSTable/SSTable"+fileNum+"/usertable-"+fileNum+"-Filter.db", key) {
-			// If it does, we then check the Summary of the SSTable
-			foundSummary, offsetIndex := CheckSummary("Data/SSTable/SSTable"+fileNum+"/usertable-"+fileNum+"-Summary.db", key)
-			// If the key is inside the Summary we find the offset in the index file and the data file
-			if foundSummary {
-				foundIndex, offsetData := CheckIndex("Data/SSTable/SSTable"+fileNum+"/usertable-"+fileNum+"-Index.db", key, offsetIndex)
-				if foundIndex {
-					// Finaly we read the key value from the Data file, send it to the user and push it in the cache
-					EI, cacheInfo := CheckData("Data/SSTable/SSTable"+fileNum+"/usertable-"+fileNum+"-Data.db", key, offsetData)
-					cache.Add(key, *cacheInfo)
-					return EI
+	for i := 1; i <= LSM.MAX_LEVEL; i++ {
+		files, err := ioutil.ReadDir("./Data/SSTable/Level" + strconv.Itoa(i))
+		Panic(err)
+		// We go through the list of SSTables
+		for _, file := range files {
+			fileNum := file.Name()[7:] // Get the number of the SSTable
+			// First we load the BloomFilter and check if it MIGHT contain the key
+			prefix := "Data/SSTable/Level" + strconv.Itoa(i) + "/SSTable" + fileNum + "/usertable-" + strconv.Itoa(i)
+			if CheckBloomFilter(prefix+"-Filter.db", key) {
+				// If it does, we then check the Summary of the SSTable
+				foundSummary, offsetIndex := CheckSummary(prefix+"-Summary.db", key)
+				// If the key is inside the Summary we find the offset in the index file and the data file
+				if foundSummary {
+					foundIndex, offsetData := CheckIndex(prefix+"-Index.db", key, offsetIndex)
+					if foundIndex {
+						// Finaly we read the key value from the Data file, send it to the user and push it in the cache
+						EI, cacheInfo := CheckData(prefix+"-Data.db", key, offsetData)
+						cache.Add(key, *cacheInfo)
+						return EI
+					}
 				}
 			}
 		}
 	}
+
 	// If the element is not found in ANY SSTable we return nil
 	return nil
 
