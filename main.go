@@ -87,7 +87,8 @@ func meni(mem *memtable.SkipList, cache *lru.Cache, tb *TokenBucket.TokenBucket)
 		fmt.Println("Chose option: ")
 		fmt.Println("1) Input path to file")
 		fmt.Println("2) Input CRUD command")
-		fmt.Println("3) Exit")
+		fmt.Println("3) Compactions")
+		fmt.Println("4) Exit")
 		fmt.Println(">> ")
 		var choice string
 		fmt.Scanln(&choice)
@@ -116,7 +117,9 @@ func meni(mem *memtable.SkipList, cache *lru.Cache, tb *TokenBucket.TokenBucket)
 				} // else : Too many requests for the set time interval
 			}
 			ReadUserInput(mem, cache)
-		} else if choice == "3" {
+		} else if choice == "3"{
+			CRUD.Compact()
+		} else if choice == "4" {
 			os.Exit(3)
 		} else {
 			fmt.Println("Invalid option, try again")
