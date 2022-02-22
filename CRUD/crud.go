@@ -34,10 +34,11 @@ func Delete(mem *memtable.SkipList, key string) *memtable.SkipList {
 	deleted := mem.Delete(key)
 	// If key doesn't exist in memtable it is first added than deleted
 	if !deleted {
-		mem.Insert(key, []byte(""), time.Now().Unix())
+		a := mem.Insert(key, []byte(""), time.Now().Unix())
 		mem.Delete(key)
+		return a
 	}
-	return mem
+	return nil
 }
 
 func Compact() {

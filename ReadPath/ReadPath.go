@@ -2,6 +2,7 @@ package ReadPath
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 	"io/ioutil"
 	"project/structures/Bloom_Filter"
@@ -28,6 +29,21 @@ type ElementInfo struct {
 	ValueSize uint64
 	Key       string
 	Value     []byte
+}
+
+func PrintElement(element *ElementInfo) {
+	fmt.Print("CRC: " + strconv.Itoa(int(element.CRC)))
+	fmt.Print("; Timestamp: " + strconv.Itoa(int(element.Timestamp)))
+	if element.Tombstone == true {
+		fmt.Print("; Tombstone: true")
+	} else {
+		fmt.Print("; Tombstone: false")
+	}
+	fmt.Print("; Key Size: " + strconv.Itoa(int(element.KeySize)))
+	fmt.Print("; Value Size: " + strconv.Itoa(int(element.ValueSize)))
+	fmt.Print("; Key: " + element.Key)
+	fmt.Print("; Value: " + string(element.Value) + "\n")
+
 }
 
 func CheckMemtable(sl *memtable.SkipList, key string) (*ElementInfo, *lru.Information) {
@@ -143,6 +159,8 @@ func ReadPath(memtable *memtable.SkipList, cache *lru.Cache, key string) *Elemen
 	}
 	// If key is not found in the memory we check the SSTables on the disk
 	// A list of all SSTables is created
+	var foundElement *ElementInfo = nil
+	var cacheElement *lru.Information = nil
 	for i := 1; i <= LSM.MAX_LEVEL; i++ {
 		files, err := ioutil.ReadDir("./Data/SSTable/Level" + strconv.Itoa(i))
 		Panic(err)
@@ -159,9 +177,11 @@ func ReadPath(memtable *memtable.SkipList, cache *lru.Cache, key string) *Elemen
 					foundIndex, offsetData := CheckIndex(prefix+"-Index.db", key, offsetIndex)
 					if foundIndex {
 						// Finaly we read the key value from the Data file, send it to the user and push it in the cache
-						EI, cacheInfo := CheckData(prefix+"-Data.db", key, offsetData)
-						cache.Add(key, *cacheInfo)
-						return EI
+						EI, c := CheckData(prefix+"-Data.db", key, offsetData)
+						if foundElement == nil || foundElement.Timestamp <= EI.Timestamp {
+							foundElement = EI
+							cacheElement = c
+						}
 					}
 				}
 			}
@@ -169,6 +189,7 @@ func ReadPath(memtable *memtable.SkipList, cache *lru.Cache, key string) *Elemen
 	}
 
 	// If the element is not found in ANY SSTable we return nil
-	return nil
+	cache.Add(key, *cacheElement)
+	return foundElement
 
 }
