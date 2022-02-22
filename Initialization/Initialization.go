@@ -55,13 +55,12 @@ func Configure() {
 		LSM.MAX_LEVEL = config.LSMMaxLevel
 		TokenBucket.MAX_REQ = config.MaxRequestPerInterval
 		TokenBucket.INTERVAL = config.Interval
-	} else {	// Configurational file is non-existent, resort to default values
+	} else {	// Configuration file is non-existent, resort to default values
 		wal.SetDefaultParam()
 		memtable.SetDefaultParam()
 		bloom_filter.SetDefaultParam()
 		lru.SetDefaultParam()
 		LSM.SetDefaultParam()
-		TokenBucket.MAX_REQ = TokenBucket.DEFAULT_MAX_REQUEST
-		TokenBucket.INTERVAL = TokenBucket.DEFAULT_MAX_REQUEST
+		TokenBucket.SetDefaultParam()
 	}
 }

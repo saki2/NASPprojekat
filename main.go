@@ -81,7 +81,7 @@ func ReadFileInput(path string, mem *memtable.SkipList, cache *lru.Cache) {
 	fmt.Println("Successfully read file")
 }
 
-func meni(mem *memtable.SkipList, cache *lru.Cache) {
+func meni(mem *memtable.SkipList, cache *lru.Cache, tb *TokenBucket.TokenBucket) {
 	var err error
 	for err == nil {
 		fmt.Println("Chose option: ")
@@ -103,6 +103,22 @@ func meni(mem *memtable.SkipList, cache *lru.Cache) {
 				ReadFileInput(path, mem, cache)
 			}
 		} else if choice == "2" {
+			// TOKEN BUCKET ALGORITHM
+			if Now()-tb.LastReset >= tb.Interval {	// Interval has passed, counters are reset
+				tb.LastReset = Now()
+				tb.AvailableReq = tb.MaxReq
+				fmt.Println("Interval reset")
+				ReadUserInput(mem, cache)
+				tb.AvailableReq -= 1
+			} else {
+				if tb.AvailableReq-1 > 0 {
+					fmt.Println("In interval")
+					ReadUserInput(mem, cache)
+					tb.AvailableReq -= 1
+				} else {
+					fmt.Println("Too many requests for the set time interval")
+				}
+			}
 			ReadUserInput(mem, cache)
 		} else if choice == "3" {
 			os.Exit(3)
@@ -119,36 +135,24 @@ func main() {
 	Initialization.Configure()
 	Initialization.CreateDataFiles()
 
+	// Initializing structures in memory
 	memtableInstance := memtable.SkipList{}
 	memtableInstance.NewSkipList()
-	//cache := lru.NewCache()
-	TokenBucketInstance := TokenBucket.NewTokenBucket()
+	cache := lru.NewCache()
+	tb := TokenBucket.NewTokenBucket()
+	tb.LastReset = Now()
+	tb.AvailableReq = tb.MaxReq
+
+	// Scanning wal directory
 	WritePath.WalSegmentName = wal.ScanWal(&memtableInstance)
 	if memtableInstance.Size == 0 {		// There is no leftover data from logs
 		WritePath.CreateLogFile()
 		WritePath.SegmentElements = 0
 	} else {
 		WritePath.SegmentElements = uint64(wal.CalculateSegmentSize(WritePath.WalSegmentName))
-		fmt.Println(WritePath.SegmentElements)
 	}
 
-	lastReset := Now()
-	availableReq := TokenBucketInstance.MaxReq
-	if Now()-lastReset >= TokenBucketInstance.Interval {	// Interval has passed, counters are reset
-		lastReset = Now()
-		availableReq = TokenBucketInstance.MaxReq
-		fmt.Println("Interval reset")
-		// salje se zahtev
-		availableReq -= 1
-	} else {
-		if availableReq-1 > 0 {
-			fmt.Println("In interval")
-			// salje se zahtev
-			availableReq -= 1
-		} else {
-			fmt.Println("Too many requests for the set time interval")
-		}
-	}
+	meni(&memtableInstance, cache, tb)
 }
 
 func Now() int64 {

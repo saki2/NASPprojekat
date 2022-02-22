@@ -16,6 +16,8 @@ func SetDefaultParam() {
 type TokenBucket struct {
 	MaxReq int
 	Interval int64
+	AvailableReq int
+	LastReset int64
 }
 
 func NewTokenBucket() *TokenBucket {
@@ -24,3 +26,4 @@ func NewTokenBucket() *TokenBucket {
 	t.Interval = INTERVAL
 	return t
 }
+
