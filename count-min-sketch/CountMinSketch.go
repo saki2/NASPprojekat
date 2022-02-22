@@ -24,6 +24,7 @@ func (c *CountMinSketch) newCountMinSketch() {
 	for i := range c.Table {
 		c.Table[i] = make([]uint, c.M)
 	}
+	
 }
 
 func hash_(s string) uint32 {
