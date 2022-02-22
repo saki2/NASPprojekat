@@ -37,6 +37,9 @@ func NewCache() *Cache {
 	return c
 }
 
+func (cache *Cache) ContainsKey(key string) {
+}
+
 func SetDefaultParam() {
 	CAPACITY = DEFAULT_CAPACITY
 }
@@ -65,7 +68,7 @@ func (cache *Cache) Add(key string, info Information) {
 	listItem, found := cache.dataMap[p.Key]
 	if found {
 		cache.data.MoveToBack(listItem)
-	} else {                                      // Element not in cache
+	} else { // Element not in cache
 		if cache.data.Len()+1 <= cache.capacity { // Cache not up to capacity
 			cache.data.PushBack(p)
 		} else {

@@ -1,7 +1,6 @@
 package WritePath
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"project/structures/SSTable"
@@ -20,12 +19,10 @@ func WritePath(memtable *memtable.SkipList, cache *lru.Cache, key string, value 
 	if SegmentElements+1 > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
 		CreateLogFile()
 		SegmentElements = 0
-		fmt.Println("wal segment at capacity, segmentelements", SegmentElements)
 	}
 	err := wal.Add(key, value, WalSegmentName, false)
 	if err == nil { 		// Commit log confirmed entry
 		SegmentElements += 1
-		fmt.Println("segmentelements + 1 =", SegmentElements)
 		_, found := cache.Find(key)
 		if found {
 			cache.Update(key, value, uint64(time.Now().Unix()), false)
