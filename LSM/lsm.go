@@ -34,9 +34,9 @@ func Compactions() {
 			break
 		}
 		// We go through all the pairs found in the level directory
+		x := 0 //  we pick the first two files than the next two and so on
+		y := 1
 		for j := 0; j < (len(files) / 2); j++ {
-			x := 0 //  we pick the first two files than the next two and so on
-			y := 1
 			filepath1 := "./Data/SSTable/Level" + strconv.Itoa(i) + "/" + files[x].Name() + "/usertable-" + strconv.Itoa(i) + "-Data.db"
 			// We only need their Data file
 			filepath2 := "./Data/SSTable/Level" + strconv.Itoa(i) + "/" + files[y].Name() + "/usertable-" + strconv.Itoa(i) + "-Data.db"
@@ -63,7 +63,7 @@ func Merge(sstable1Path string, sstable2Path string, level int) {
 	Panic(err)
 	defer sstable2.Close()
 	// Create the new files
-	newSSTableName := SSTable.CreateSSTable(2)
+	newSSTableName := SSTable.CreateSSTable(level)
 	data, index, TOC, filter, metaData, summary := SSTable.CreateFilesOfSSTable(newSSTableName, level)
 	defer data.Close()
 	defer index.Close()
@@ -129,29 +129,23 @@ func IterateElements(br1, br2 *bufio.Reader, data, index *os.File, bloomFilter *
 	crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2 = ReadElement(br2)
 	for err == nil {
 		if string(key1) < string(key2) {
-			// If element of Data1 is smaller than element of Data2 than that element is written and Data1 is advanced while Data2 remains same
-			if tombStone1[0] == 0 {
-				// we only write the element if it is not deleted
-				WriteElement(crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
-				i++
-			}
+			WriteElement(crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+			i++
 			// advancing in the file
 			crc1, timeStamp1, tombStone1, keySize1, valueSize1, key1, value1 = ReadElement(br1)
 			// If we have reached the end of Data1 file we write the rest of the contents of Data2
 			if crc1 == nil {
-				if tombStone2[0] == 0 {
-					WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
-					i++
-				}
+				WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+				i++
+
 				Finish(br2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i, string(key2))
 				break
 			}
 		} else if string(key1) > string(key2) {
 			// If element of Data2 is smaller than element of Data1 than that element is written and Data2 is advanced while Data1 remains same
-			if tombStone2[0] == 0 {
-				WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
-				i++
-			}
+			WriteElement(crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2, data, index, bloomFilter, hashVal, summaryStruct, offsetData, offsetIndex, i)
+			i++
+
 			crc2, timeStamp2, tombStone2, keySize2, valueSize2, key2, value2 = ReadElement(br2)
 			if crc2 == nil {
 				if tombStone1[0] == 0 {
