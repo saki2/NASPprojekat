@@ -1,49 +1,59 @@
-package main
+package count_min_sketch
 
 import "C"
 import (
-	"fmt"
-	"github.com/spaolacci/murmur3"
-	"hash"
+	"encoding/gob"
+	"hash/fnv"
 	"math"
-	"time"
+	"os"
+	"project/structures/Bloom_Filter"
 )
 
 type CountMinSketch struct {
-	k uint
-	m uint
-	hashFunctions []hash.Hash32
-	table [][]uint
+	K uint
+	M uint
+	HashFunctions []uint32
+	Table [][]uint
 }
 
 func (c *CountMinSketch) newCountMinSketch() {
-	c.m = CalculateM(0.01)
-	c.k = CalculateK(0.01)
-	c.hashFunctions = CreateHashFunctions(c.k)
-	c.table = make([][] uint, c.k)
-	for i := range c.table {
-		c.table[i] = make([]uint, c.m)
-	}
-}
-
-func (c *CountMinSketch) append(elem string) {
-	for i:=0; i < int(c.k); i++ {
-		c.hashFunctions[i].Reset()
-		c.hashFunctions[i].Write([]byte(elem))
-		j := c.hashFunctions[i].Sum32() % uint32(c.m)
-		c.table[i][j] += 1
+	c.M = CalculateM(0.01)
+	c.K = CalculateK(0.01)
+	c.HashFunctions = bloom_filter.CreateHashFunctions(c.K)
+	c.Table = make([][] uint, c.K)
+	for i := range c.Table {
+		c.Table[i] = make([]uint, c.M)
 	}
 
 }
 
-func (c *CountMinSketch) frequency(elem string) uint {
-	R := make([]uint, c.k, c.k)
+func hash_(s string) uint32 {
+	// Hashes string to an unsigned 32 bit integer
+	h := fnv.New32a()
+	_, err := h.Write([]byte(s))
+	if err != nil {
+		panic(err.Error())
+	}
+	return h.Sum32()
+}
 
-	for i:=0; i < int(c.k); i++ {
-		c.hashFunctions[i].Reset()
-		c.hashFunctions[i].Write([]byte(elem))
-		j := c.hashFunctions[i].Sum32() % uint32(c.m)
-		R[i] = c.table[i][j]
+func (c *CountMinSketch) append(key string)  {
+	for i:=0; i < int(c.K); i++ {
+		hashI := c.HashFunctions[i]
+		sum := math.Abs(float64(hashI - hash_(key)))
+		j:= uint(sum) % c.M
+		c.Table[i][j] += 1
+	}
+}
+
+func (c *CountMinSketch) frequency(key string) uint {
+	R := make([]uint, c.K, c.K)
+
+	for i:=0; i < int(c.K); i++ {
+		hashI := c.HashFunctions[i]
+		sum := math.Abs(float64(hashI - hash_(key)))
+		j:= uint(sum) % c.M
+		R[i] = c.Table[i][j]
 	}
 
 
@@ -65,13 +75,41 @@ func CalculateK(delta float64) uint {
 	return uint(math.Ceil(math.Log(math.E / delta)))
 }
 
-func CreateHashFunctions(k uint) []hash.Hash32 {
-	h := []hash.Hash32{}
-	ts := uint(time.Now().Unix())
-	for i := uint(0); i < k; i++ {
-		h = append(h, murmur3.New32WithSeed(uint32(ts+1)))
+func Panic(err error) {
+	if err != nil {
+		panic(err.Error())
 	}
-	return h
 }
 
+func ReadCMS(path string) *CountMinSketch {
 
+	file, err := os.OpenFile(path, os.O_RDONLY, 0700)
+	Panic(err)
+	defer file.Close()
+	decoder := gob.NewDecoder(file)
+	var cms = new(CountMinSketch)
+	file.Seek(0, 0)
+	err = decoder.Decode(cms)
+	Panic(err)
+	return cms
+}
+
+func WriteCMS(cms *CountMinSketch, path string, createdFile *os.File) {
+	var file *os.File
+	var err error
+	if path == "" {
+		file = createdFile
+	}else {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			file, err = os.Create(path)
+			Panic(err)
+		} else {
+			file, err = os.OpenFile(path, os.O_WRONLY, 0700)
+			Panic(err)
+		}
+	}
+	defer file.Close()
+	encoder := gob.NewEncoder(file)
+	err = encoder.Encode(cms)
+	Panic(err)
+}

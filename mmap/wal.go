@@ -1,13 +1,19 @@
 package wal
+
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"github.com/edsrzf/mmap-go"
 	"hash/crc32"
+	"io/ioutil"
 	"log"
 	"os"
+	"project/structures/SSTable"
+	"project/structures/memtable"
+	"strconv"
+	"strings"
 	"time"
-
 )
 
 /*
@@ -80,7 +86,7 @@ func Append(file *os.File, data []byte) error {
 
 // flag argument
 // mmap.ANON - The mapped memory will not be backed by a file. If ANON is set in flags, f is ignored.
-func read(fileName string ) ([]byte, error) {
+func Read(fileName string ) ([]byte, error) {
 	file, err := os.OpenFile(fileName, os.O_RDWR | os.O_CREATE, 0644)
 	fatal(err)
 	defer file.Close()
@@ -129,7 +135,7 @@ func fatal(err error) {
 	}
 }
 
-func Add(key string, value []byte, fileName string) error {
+func Add(key string, value []byte, fileName string, ts bool) error {
 	f, err := os.OpenFile(fileName, os.O_RDWR | os.O_CREATE, 0644)
 	fatal(err)
 	defer f.Close()
@@ -145,13 +151,17 @@ func Add(key string, value []byte, fileName string) error {
 	binary.LittleEndian.PutUint64(timeStamp, uint64(Time))
 
 	tombstone := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tombstone, uint64(0))
+	if ts == false{
+		binary.LittleEndian.PutUint64(tombstone, uint64(0))
+	} else {
+		binary.LittleEndian.PutUint64(tombstone, uint64(1))
+	}
 
 	keyLine := make([]byte, KEY_SIZE)
 	binary.LittleEndian.PutUint64(keyLine, uint64(len([]byte(key))))
 
 	valueLine := make([]byte, VALUE_SIZE)
-	binary.LittleEndian.PutUint64(valueLine, uint64(len([]byte(key))))
+	binary.LittleEndian.PutUint64(valueLine, uint64(len(value)))
 
 	temp := make([]byte, 0)
 
@@ -168,6 +178,149 @@ func Add(key string, value []byte, fileName string) error {
 
 }
 
+// ScanWal : Gathers data from log segments to load in to memtable
+func ScanWal(memtableInstance *memtable.SkipList) string {
+	files, err := ioutil.ReadDir("./Wal")
+	SSTable.Panic(err)
+	m := make(map[int]string)
+	for _, file := range files {
+		fileName := file.Name()
+		tokens := strings.Split(fileName, "_")
+		labels := strings.Split(tokens[1], ".")
+		num, _ := strconv.Atoi(labels[0])
+		m[num] = fileName
+	}
+	if len(m) > 0 {
+		segmentCounter := 0 // Memtable consists of data from these last segments
+		for i := 1; i <= len(m); i++ {
+			ReadData("./Wal/"+m[i], memtableInstance, &segmentCounter)
+		}
+		lowWatermark := len(files) - segmentCounter // Index up to which segments are deleted
+		if lowWatermark > 0 {
+			for i := 1; i <= lowWatermark; i++ {
+				err := os.Remove("./Wal/" + m[i])
+				SSTable.Panic(err)
+			}
+		}
+		path := "./Wal/wal_" + strconv.Itoa(len(files)) + ".db"
+		return path
+	}
+	return ""
+}
 
+// ReadData : Reads from a wal segment to insert to memtable
+func ReadData(path string, memtableInstance *memtable.SkipList, segmentCounter *int) {
+	//+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
+	//|    CRC (4B)   | Timestamp (16B) | Tombstone(1B) | Key Size (8B) | Value Size (8B) | Key | Value |
+	//+---------------+-----------------+---------------+---------------+-----------------+-...-+--...--+
 
+	file, err := os.OpenFile(path, os.O_RDONLY, 0700)
+	SSTable.Panic(err)
+	defer file.Close()
+	_, err = file.Seek(0, 0)
+	SSTable.Panic(err)
+	br := bufio.NewReader(file)
 
+	for err == nil {
+		crc := make([]byte, 4)
+		_, err = br.Read(crc)
+		if err != nil {
+			break
+		}
+		timeStamp := make([]byte, 16)
+		_, err = br.Read(timeStamp)
+		t := binary.LittleEndian.Uint64(timeStamp)
+		timestamp := int64(t)
+		if err != nil {
+			break
+		}
+		tombstone := make([]byte, 8)
+		_, err = br.Read(tombstone)
+		if err != nil {
+			break
+		}
+		keySize := make([]byte, KEY_SIZE)
+		_, err = br.Read(keySize)
+		if err != nil {
+			break
+		}
+		valueSize := make([]byte, VALUE_SIZE)
+		_, err = br.Read(valueSize)
+		if err != nil {
+			break
+		}
+		key := make([]byte, binary.LittleEndian.Uint64(keySize))
+		_, err = br.Read(key)
+		value := make([]byte, binary.LittleEndian.Uint64(valueSize))
+		_, err = br.Read(value)
+		forFlush := memtableInstance.Insert(string(key), value, timestamp)
+
+		if tombstone[0] == 1 {
+			memtableInstance.Delete(string(key))
+		}
+		if forFlush != nil { 				// Memtable up to capacity, flush to disk
+			SSTable.Flush(forFlush)
+			memtableInstance.NewSkipList() 	// Reset memtable
+		}
+	}
+
+	if memtableInstance.Size > 0 {	// Segment still has active data in the memtable
+		*segmentCounter += 1
+	} else {						// All previous segments including this one had data flushed - memtable is empty
+		*segmentCounter = 0
+	}
+
+}
+
+func DeleteWal() {
+	files, err := ioutil.ReadDir("./Wal")
+	SSTable.Panic(err)
+	for _, file := range files {
+		err = os.Remove("Wal/" + file.Name())
+		SSTable.Panic(err)
+	}
+}
+
+func CalculateSegmentSize(filename string) int {
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0700)
+	SSTable.Panic(err)
+	defer file.Close()
+	SSTable.Panic(err)
+	br := bufio.NewReader(file)
+
+	segmentSize := 0
+
+	for err == nil {
+		crc := make([]byte, 4)
+		_, err = br.Read(crc)
+		if err != nil {
+			break
+		}
+		timeStamp := make([]byte, 16)
+		_, err = br.Read(timeStamp)
+		if err != nil {
+			break
+		}
+		tombstone := make([]byte, 8)
+		_, err = br.Read(tombstone)
+		if err != nil {
+			break
+		}
+		keySize := make([]byte, KEY_SIZE)
+		_, err = br.Read(keySize)
+		if err != nil {
+			break
+		}
+		valueSize := make([]byte, VALUE_SIZE)
+		_, err = br.Read(valueSize)
+		if err != nil {
+			break
+		}
+		key := make([]byte, binary.LittleEndian.Uint64(keySize))
+		_, err = br.Read(key)
+		value := make([]byte, binary.LittleEndian.Uint64(valueSize))
+		_, err = br.Read(value)
+		segmentSize += 1
+	}
+	return segmentSize
+}
