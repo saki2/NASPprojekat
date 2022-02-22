@@ -3,9 +3,11 @@ package CRUD
 import (
 	"project/structures/LSM"
 	"project/structures/ReadPath"
+	"project/structures/SSTable"
 	"project/structures/WritePath"
 	"project/structures/lru"
 	"project/structures/memtable"
+	wal "project/structures/mmap"
 	"time"
 )
 
@@ -29,16 +31,34 @@ func Update(mem *memtable.SkipList, cache *lru.Cache, key string, value []byte, 
 	WritePath.WritePath(mem, cache, key, value, SegmentNumElements)
 }
 
-func Delete(mem *memtable.SkipList, key string) *memtable.SkipList {
-	// If key exists in memtable, tombstone is put to true
-	deleted := mem.Delete(key)
-	// If key doesn't exist in memtable it is first added than deleted
-	if !deleted {
-		a := mem.Insert(key, []byte(""), time.Now().Unix())
-		mem.Delete(key)
-		return a
+func Delete(mem *memtable.SkipList, cache *lru.Cache, key string, SegmentNumElements *uint64) bool {
+
+	if *SegmentNumElements+1 > wal.SEGMENT_SIZE {	// Wal segment at capacity - new segment is created
+		WritePath.CreateLogFile()
+		*SegmentNumElements = 0
 	}
-	return nil
+	err := wal.Add(key, []byte(""), WritePath.WalSegmentName, true)
+	if err == nil { 		// Commit log confirmed entry
+		*SegmentNumElements += 1
+		_, found := cache.Find(key)
+		if found {
+			cache.Update(key, []byte(""), uint64(time.Now().Unix()), true)
+		}
+		// If key exists in memtable, tombstone is put to true
+		deleted := mem.Delete(key)
+		// If key doesn't exist in memtable it is first added than deleted
+		if !deleted {
+			a := mem.Insert(key, []byte(""), time.Now().Unix())
+			mem.Delete(key)
+			if a != nil {			// Memtable up to capacity, flush to disk
+				SSTable.Flush(a)
+				mem.NewSkipList()		// Reset memtable
+				wal.DeleteWal()
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func Compact() {

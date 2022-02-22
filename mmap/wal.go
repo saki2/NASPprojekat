@@ -135,7 +135,7 @@ func fatal(err error) {
 	}
 }
 
-func Add(key string, value []byte, fileName string) error {
+func Add(key string, value []byte, fileName string, ts bool) error {
 	f, err := os.OpenFile(fileName, os.O_RDWR | os.O_CREATE, 0644)
 	fatal(err)
 	defer f.Close()
@@ -151,7 +151,11 @@ func Add(key string, value []byte, fileName string) error {
 	binary.LittleEndian.PutUint64(timeStamp, uint64(Time))
 
 	tombstone := make([]byte, 8)
-	binary.LittleEndian.PutUint64(tombstone, uint64(0))
+	if ts == false{
+		binary.LittleEndian.PutUint64(tombstone, uint64(0))
+	} else {
+		binary.LittleEndian.PutUint64(tombstone, uint64(1))
+	}
 
 	keyLine := make([]byte, KEY_SIZE)
 	binary.LittleEndian.PutUint64(keyLine, uint64(len([]byte(key))))

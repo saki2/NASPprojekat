@@ -19,9 +19,9 @@ func WritePath(memtable *memtable.SkipList, cache *lru.Cache, key string, value 
 		CreateLogFile()
 		*SegmentNumElements = 0
 	}
-	err := wal.Add(key, value, WalSegmentName)
-	*SegmentNumElements += 1
+	err := wal.Add(key, value, WalSegmentName, false)
 	if err == nil { 		// Commit log confirmed entry
+		*SegmentNumElements += 1
 		_, found := cache.Find(key)
 		if found {
 			cache.Update(key, value, uint64(time.Now().Unix()), false)
